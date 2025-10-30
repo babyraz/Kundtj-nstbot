@@ -1,12 +1,47 @@
+// import { ChatPromptTemplate } from "@langchain/core/prompts";
+
+// export const standaloneQuestionTemplate =
+//   ChatPromptTemplate.fromTemplate(`Givet en fråga, omformulera frågan till en fristående fråga och returnera endast den fristående frågan.
+//   Fråga: {question}
+//   fristående fråga:`);
+
+// export const answerTemplate =
+//   ChatPromptTemplate.fromTemplate(`
+//   Du är en hjälpsam men strikt supportbot för TechNova AB. 
+// Du får ENDAST använda information från "kontexten" nedan för att svara.
+
+// Om svaret inte finns i kontexten:
+// - Svara: "Jag är ledsen, men jag hittar ingen information om det i dokumentationen."
+
+// Gör INGA egna gissningar eller förklaringar.
+
+// Tidigare konversation:
+// {chat_history}
+
+// Kontext:
+// {context}
+
+// Fråga:
+// {question}
+
+// Svara på svenska:
+// `);
 import { PromptTemplate } from "@langchain/core/prompts";
 
-export const standaloneQuestionTemplate =
-  PromptTemplate.fromTemplate(`Givet en fråga, omformulera frågan till en fristående fråga och returnera endast den fristående frågan.
-  Fråga: {question}
-  fristående fråga:`);
+export const answerTemplate = PromptTemplate.fromTemplate(`
+Du är en hjälpsam supportbot för TechNova AB.
+Du får ENDAST svara på frågor som kan besvaras med den tillhandahållna kontexten.
+Om frågan inte finns i kontexten, svara vänligt att du inte kan svara.
 
-export const answerTemplate =
-  PromptTemplate.fromTemplate(`Du är en hjälpsam supportbot för Technova AB som strikt utgår från kontexten för att svara på kundens fråga. Ge kunden så mycket information som du bedömer vara relevant men använd endast kontexten som grund för ditt svar. Förklara alltid vart i dokumentationen/kontexten du hämtar dina svar ifrån. Om kunden ställer en fråga som inte är relaterad till kontexten, ge ett vänligt svar där du förklarar att du inte kan svara på frågan.
-kontext: {context}
-fråga: {question}
-svar:`);
+Tidigare konversation:
+{chat_history}
+
+Kontext:
+{context}
+
+Fråga:
+{question}
+
+Svara på svenska:
+`);
+

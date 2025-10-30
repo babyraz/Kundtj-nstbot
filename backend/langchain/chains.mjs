@@ -1,70 +1,124 @@
-import { ConversationChain } from "langchain/chains";
-import { BufferMemory } from "langchain/memory";
-import { RunnableSequence, RunnablePassthrough } from "@langchain/core/runnables";
-import { StringOutputParser } from "@langchain/core/output_parsers";
-import { ChatOllama } from "@langchain/ollama";
-
+import { RunnableSequence } from "@langchain/core/runnables";
+import { Ollama } from "@langchain/ollama";
+import { answerTemplate } from "./promptTemplates.mjs";
 import { retreiveDocuments } from "../service/setupRetriever.mjs";
-import {
-  standaloneQuestionTemplate,
-  answerTemplate,
-} from "./promptTemplates.mjs";
+import { BufferMemory } from "langchain/memory";
 
-const llm = new ChatOllama({
-  model: "llama3.2",
-});
-
+// 🧠 Tillfälligt minne i RAM
 const memory = new BufferMemory({
   memoryKey: "chat_history",
-  inputKey: "question",
-  outputKey: "answer",
 });
 
-const prompt = ChatPromptTemplate.fromTemplate(`
-  Du är en hjälpsam kundtjänstassistent för TechNova AB.
+// 🦙 LLM
+const llm = new Ollama({
+  model: "llama3.2",
+  temperature: 0.3,
+});
+
+// 🔗 Kedja
+const chain = RunnableSequence.from([
+  // {
+  //   invoke: async (input) => {
+  //     // Hämta befintlig historik
+  //     const memoryVars = await memory.loadMemoryVariables({});
+  //     const chatHistory = memoryVars.chat_history || "";
+
+  //     // Hämta kontext
+  //     const contextDocs = await retreiveDocuments.invoke(input.question);
+  //     const context = (contextDocs || []).map(d => d.pageContent).join("\n\n");
+
+  //     // Skapa textprompt
+  //     const prompt = await answerTemplate.format({
+  //       context,
+  //       question: input.question,
+  //       chat_history: chatHistory,
+  //     });
+      
+  //     console.log("🧩 Generated prompt inside first invoke:\n", prompt);
+      
+  //     return { prompt, question: input.question, chatHistory };
+  //   },
+  // },
+  {
+    invoke: async (input) => {
+      console.log("🟢 chain input =", input);
+      const memoryVars = await memory.loadMemoryVariables({});
+      const chatHistory = memoryVars.chat_history || "";
   
-  Tidigare konversation:
-  {chat_history}
+      const contextDocs = await retreiveDocuments.invoke(input.question);
+      const context = (contextDocs || []).map(d => d.pageContent).join("\n\n");
   
-  Fråga:
-  {question}
+      console.log("🧠 DEBUG values before formatting prompt:");
+      console.log(" - context length:", context?.length);
+      console.log(" - question:", input?.question);
+      console.log(" - chatHistory length:", chatHistory?.length);
   
-  Relevanta dokument:
-  {context}
+      const prompt = await answerTemplate.format({
+        context,
+        question: input.question,
+        chat_history: chatHistory,
+      });
   
-  Svara tydligt och kortfattat på svenska.
-  `);
+      console.log("🧩 Generated prompt inside first invoke:\n", prompt);
   
-  const chain = RunnableSequence.from([
-    {
-      // Step 1: Add chat history to the question
-      invoke: async (input) => {
-        const memoryVars = await memory.loadMemoryVariables({});
-        const chatHistory = memoryVars.chat_history || "";
-        const contextDocs = await retreiveDocuments.invoke(input.question);
-        const context = contextDocs.map((d) => d.pageContent).join("\n\n");
-  
-        const result = await prompt.format({
-          chat_history: chatHistory,
-          question: input.question,
-          context,
-        });
-  
-        return { formattedPrompt: result, question: input.question };
-      },
+      return { prompt, question: input.question, chatHistory };
     },
-    {
-      // Step 2: Send to LLM
-      invoke: async ({ formattedPrompt, question }) => {
-        const answer = await model.invoke(formattedPrompt);
-        await memory.saveContext({ question }, { answer });
-        return answer;
-      },
-    },
-    new StringOutputParser(),
-  ]);
+  },
   
-  export { chain };
+  {
+    invoke: async (rawInput) => {
+      console.log("🔍 rawInput received by second invoke:", rawInput);
+  
+      // 🧩 Unwrap depending on how LangChain nested the object
+      const data =
+        rawInput?.invoke ??
+        rawInput?.input ??
+        rawInput?.output ??
+        rawInput;
+  
+      const { prompt, question, chatHistory } = data || {};
+  
+      console.log("🧩 Prompt about to send:\n", prompt);
+  
+      if (!prompt || typeof prompt !== "string") {
+        throw new Error(
+          "Prompt is not a string. Got: " +
+            typeof prompt +
+            " | rawInput keys: " +
+            Object.keys(rawInput || {})
+        );
+      }
+  
+      // 🦙 Call the model
+      const response = await llm.invoke(prompt);
+      const answerText = response.output_text || response;
+  
+      // 🧠 Update chat history
+      const newHistory =
+        `${chatHistory}\nAnvändare: ${question}\nBot: ${answerText}\n`;
+      memory.chat_history = newHistory;
+  
+      console.log("🧠 Chat history updated:\n", newHistory);
+  
+      return answerText;
+    },
+  },
+  
+  
+  
+  
+  
+  
+]);
+
+export { chain };
+
+
+
+
+
+
+
 
 
 // function combineDocuments(docs) {

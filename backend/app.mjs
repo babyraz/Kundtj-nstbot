@@ -1,8 +1,9 @@
+import "dotenv/config";
+
 import express, { json } from "express";
 import cors from "cors";
 const app = express();
 const PORT = process.env.PORT || 3000;
-import "dotenv/config";
 
 import askRouter from "./routes/ask.mjs";
 
